@@ -1,0 +1,1013 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cycling Gear Speed Calculator</title>
+<style>
+  :root {
+    --bg: #0f1419;
+    --panel: #1a2129;
+    --panel-2: #222b34;
+    --line: #2e3a44;
+    --text: #e6edf3;
+    --muted: #8b98a5;
+    --accent: #f2a900;     /* big ring / Setup A */
+    --accent2: #4aa3ff;    /* small ring / Setup B */
+    --good: #46c66d;
+    --bad: #ef5350;
+    --shadow: 0 6px 24px rgba(0,0,0,.35);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: radial-gradient(1200px 600px at 70% -10%, #1c2530 0%, var(--bg) 60%);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+    padding: 24px 16px 64px;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; }
+  header.page { margin-bottom: 20px; }
+  header.page h1 { font-size: 1.7rem; margin: 0 0 4px; letter-spacing: -0.5px; }
+  header.page p { margin: 0; color: var(--muted); font-size: .92rem; }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 18px;
+    box-shadow: var(--shadow);
+    margin-bottom: 20px;
+  }
+  .panel h2 {
+    font-size: 1.05rem; margin: 0 0 14px; font-weight: 600;
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  }
+  .panel h2 .sub { color: var(--muted); font-weight: 400; font-size: .82rem; }
+  h3.setup-title { font-size: .95rem; margin: 18px 0 8px; display: flex; align-items: center; gap: 8px; }
+
+  /* Controls */
+  .controls {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 16px;
+  }
+  .global-row { margin-bottom: 4px; }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field label { font-size: .78rem; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+  select {
+    appearance: none;
+    background: var(--panel-2) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path fill='%238b98a5' d='M2 4l4 4 4-4z'/></svg>") no-repeat right 12px center;
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    padding: 10px 32px 10px 12px;
+    font-size: .92rem;
+    cursor: pointer;
+    width: 100%;
+  }
+  select:focus { outline: 2px solid var(--accent2); outline-offset: 1px; }
+
+  input[type="text"], input[type="number"] {
+    background: var(--panel-2); color: var(--text);
+    border: 1px solid var(--line); border-radius: 9px;
+    padding: 10px 12px; font-size: .92rem; width: 100%;
+  }
+  input:focus { outline: 2px solid var(--accent2); outline-offset: 1px; }
+  .custom-row { display: flex; gap: 8px; }
+  .custom-row .ci { display: flex; flex-direction: column; gap: 3px; flex: 1; }
+  .custom-row .ci span { font-size: .68rem; color: var(--muted); }
+
+  .cadence-row { display: flex; align-items: center; gap: 10px; }
+  .cadence-row input[type="range"] { flex: 1; accent-color: var(--accent); cursor: pointer; }
+  .cadence-row input[type="number"] { width: 72px; flex: none; text-align: center; }
+
+  .toggle-group { display: inline-flex; background: var(--panel-2); border: 1px solid var(--line); border-radius: 9px; padding: 3px; gap: 3px; }
+  .toggle-group button {
+    background: transparent; color: var(--muted); border: 0; padding: 8px 14px;
+    border-radius: 7px; cursor: pointer; font-size: .9rem; font-weight: 600;
+  }
+  .toggle-group button.active { background: var(--accent); color: #1a1200; }
+
+  /* Setup blocks */
+  .setup-block { border-left: 3px solid transparent; border-radius: 2px; }
+  #setupBlocks.cmp .setup-block { padding-left: 14px; margin-bottom: 18px; }
+  #setupBlocks.cmp .setup-block[data-setup="0"] { border-left-color: var(--accent); }
+  #setupBlocks.cmp .setup-block[data-setup="1"] { border-left-color: var(--accent2); }
+  .setup-head { display: none; align-items: center; gap: 10px; margin-bottom: 12px; }
+  #setupBlocks.cmp .setup-head { display: flex; }
+  .chip { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 7px; font-weight: 800; font-size: .82rem; color: #0f1419; }
+  .setup-desc { color: var(--muted); font-size: .9rem; }
+  .setup-block[data-setup="1"] { display: none; }
+  #setupBlocks.cmp .setup-block[data-setup="1"] { display: block; }
+
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; align-items: center; font-size: .85rem; color: var(--muted); margin-bottom: 6px; }
+  .legend:empty { display: none; }
+  .legend .dot { display: inline-block; width: 11px; height: 11px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+  .legend .ebar { display:inline-block; width:2px; height:14px; background:var(--muted); margin-right:6px; vertical-align:middle; }
+
+  /* Summary stat cards */
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px,1fr)); gap: 12px; }
+  .stat { background: var(--panel-2); border: 1px solid var(--line); border-radius: 11px; padding: 12px 14px; }
+  .stat .k { color: var(--muted); font-size: .74rem; text-transform: uppercase; letter-spacing: .5px; }
+  .stat .v { font-size: 1.45rem; font-weight: 700; margin-top: 2px; }
+  .stat .v small { font-size: .8rem; color: var(--muted); font-weight: 500; }
+
+  /* SVG charts */
+  .chart-scroll { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  svg { display: block; }
+  svg text { fill: var(--muted); font-size: 11px; font-family: inherit; }
+  .axis-line { stroke: var(--line); stroke-width: 1; }
+  .grid-line { stroke: var(--line); stroke-width: 1; stroke-dasharray: 3 4; opacity: .55; }
+
+  /* Tables */
+  .table-scroll { width: 100%; overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: .88rem; }
+  th, td { padding: 8px 10px; text-align: center; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  thead th { color: var(--muted); font-weight: 600; font-size: .8rem; }
+  tbody th { color: var(--text); font-weight: 600; background: var(--panel-2); text-align: right; }
+  td .ratio { display: block; color: var(--muted); font-size: .7rem; }
+  td .pm { display: block; color: var(--accent2); font-size: .72rem; }
+  td.cell-max { background: rgba(70,198,109,.16); }
+  td.cell-min { background: rgba(239,83,80,.14); }
+  td .sp { font-weight: 600; }
+  .step-note { color: var(--muted); font-size: .78rem; margin: 8px 2px 2px; }
+  .step-note b { color: var(--text); font-weight: 600; }
+  .assume-note { color: var(--muted); font-size: .82rem; margin: -4px 0 12px; padding: 9px 12px; background: var(--panel-2); border-left: 3px solid var(--accent); border-radius: 8px; }
+  .assume-note b { color: var(--text); }
+
+  /* Metrics comparison table */
+  table.metrics { margin-bottom: 6px; }
+  table.metrics th, table.metrics td { text-align: left; }
+  table.metrics tbody th { text-align: left; background: transparent; color: var(--muted); font-weight: 500; }
+  table.metrics td { font-weight: 600; }
+  table.metrics thead th.setcol { color: #0f1419; border-radius: 7px 7px 0 0; padding: 6px 10px; }
+
+  .tip {
+    position: fixed; pointer-events: none; z-index: 20;
+    background: #000; color: #fff; border: 1px solid var(--line);
+    padding: 7px 10px; border-radius: 8px; font-size: .8rem; opacity: 0;
+    transition: opacity .08s; box-shadow: var(--shadow); white-space: nowrap;
+  }
+  footer { color: var(--muted); font-size: .8rem; text-align: center; margin-top: 8px; }
+
+  @media (max-width: 600px) {
+    body { padding: 14px 10px 48px; }
+    .wrap { max-width: 100%; }
+    header.page h1 { font-size: 1.3rem; }
+    header.page p { font-size: .85rem; }
+    .panel { padding: 14px; border-radius: 12px; margin-bottom: 16px; }
+    .panel h2 { font-size: 1rem; }
+    .controls { gap: 12px; }
+    .toggle-group button { padding: 7px 11px; font-size: .85rem; }
+    .cadence-row input[type="number"] { width: 58px; }
+    .stats { grid-template-columns: 1fr 1fr; gap: 10px; }
+    .stat .v { font-size: 1.2rem; }
+    table { font-size: .8rem; }
+    th, td { padding: 6px 7px; }
+    h3.setup-title { font-size: .9rem; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="page">
+    <h1>🚲 Gear Speed Calculator</h1>
+    <p id="subHeader"></p>
+  </header>
+
+  <!-- CONTROLS -->
+  <section class="panel">
+    <div class="controls global-row">
+      <div class="field">
+        <label>View</label>
+        <div class="toggle-group" id="compareToggle">
+          <button data-cmp="single" class="active">Single</button>
+          <button data-cmp="compare">Compare</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>Sort gears by</label>
+        <div class="toggle-group" id="sortToggle">
+          <button data-sort="speed" class="active">Speed</button>
+          <button data-sort="gear">Gear #</button>
+          <button data-sort="realistic">Realistic</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>Cadence (RPM)</label>
+        <div class="cadence-row">
+          <input type="range" id="cadenceRange" min="40" max="140" value="100" step="1">
+          <input type="number" id="cadenceNum" min="40" max="140" value="100" step="1">
+        </div>
+      </div>
+      <div class="field">
+        <label>Wheel / Tire</label>
+        <select id="tireSelect"></select>
+      </div>
+      <div class="field" id="customTireField" style="display:none">
+        <label>Custom circ (mm)</label>
+        <input type="number" id="customTireInput" value="2155" min="1000" max="2400" step="1">
+      </div>
+      <div class="field">
+        <label>Units</label>
+        <div class="toggle-group" id="unitToggle">
+          <button data-unit="mph" class="active">mph</button>
+          <button data-unit="kmh">km/h</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="setupBlocks"></div>
+  </section>
+
+  <!-- SUMMARY (single mode) -->
+  <section class="panel" id="statsPanel">
+    <h2>Range at a glance <span class="sub" id="statsSub"></span></h2>
+    <div class="stats" id="stats"></div>
+  </section>
+
+  <!-- SPEED PER GEAR -->
+  <section class="panel">
+    <h2>Speed per gear <span class="sub" id="chart1Sub"></span></h2>
+    <div class="legend" id="legend1"></div>
+    <div class="chart-scroll"><div id="chart1"></div></div>
+  </section>
+
+  <!-- GEAR LADDER / OVERLAP -->
+  <section class="panel">
+    <h2>Gear ladder &amp; overlap <span class="sub" id="chart2Sub"></span></h2>
+    <p class="assume-note" id="assumeNote" style="display:none"></p>
+    <div class="legend" id="legend2"></div>
+    <div class="chart-scroll"><div id="chart2"></div></div>
+  </section>
+
+  <!-- TABLE -->
+  <section class="panel">
+    <h2>Speed table <span class="sub" id="tableSub"></span></h2>
+    <div class="table-scroll"><div id="table"></div></div>
+  </section>
+
+  <footer>
+    Self-contained · no internet required · speed = (chainring ÷ cog) × wheel circumference × cadence
+  </footer>
+</div>
+
+<div class="tip" id="tip"></div>
+
+<script>
+"use strict";
+
+/* ---------------------------- DATA ---------------------------- */
+const TIRES = [
+  { name: "700×25c (road)",        mm: 2105 },
+  { name: "700×28c (road)",        mm: 2136 },
+  { name: "700×32c (all-road)",    mm: 2155 },
+  { name: "700×40c (gravel)",      mm: 2200 },
+  { name: "650b ×47 (gravel)",     mm: 2090 },
+];
+const DEFAULT_TIRE = 2; // 700x32c
+
+// 2x cranksets: [big, small]
+const CRANKSETS_2X = [
+  { name: "Standard 53/39",            rings: [53, 39] },
+  { name: "Semi-compact 52/36",        rings: [52, 36] },
+  { name: "Compact 50/34",             rings: [50, 34] },
+  { name: "SRAM 48/35",                rings: [48, 35] },
+  { name: "SRAM 46/33",                rings: [46, 33] },
+  { name: "Subcompact 48/32 (SRAM Wide)", rings: [48, 32] },
+  { name: "GRX Subcompact 46/30",      rings: [46, 30] },
+];
+const RINGS_1X = [36, 38, 40, 42, 44, 46, 48];
+
+// Cassettes grouped by brand; cogs smallest -> largest
+const CASSETTES = [
+  { group: "Shimano 11-speed", items: [
+    { name: "11-28", cogs: [11,12,13,14,15,17,19,21,23,25,28] },
+    { name: "11-30", cogs: [11,12,13,14,15,17,19,21,24,27,30] },
+    { name: "11-32", cogs: [11,12,13,14,16,18,20,22,25,28,32] },
+    { name: "11-34", cogs: [11,12,13,14,16,18,20,22,25,30,34] },
+  ]},
+  { group: "Shimano 12-speed road", items: [
+    { name: "11-30", cogs: [11,12,13,14,15,16,17,19,21,24,27,30] },
+    { name: "11-34", cogs: [11,12,13,14,15,17,19,21,24,27,30,34] },
+  ]},
+  { group: "Shimano GRX", items: [
+    { name: "11-34", cogs: [11,13,15,17,19,21,23,25,27,30,34] },
+    { name: "11-40", cogs: [11,13,15,17,19,21,24,28,32,36,40] },
+    { name: "11-42 (11sp)", cogs: [11,13,15,18,21,24,28,32,37,42] },
+  ]},
+  { group: "SRAM road 12-speed", items: [
+    { name: "10-28", cogs: [10,11,12,13,14,15,16,17,19,21,24,28] },
+    { name: "10-30", cogs: [10,11,12,13,14,15,16,17,19,22,26,30] },
+    { name: "10-33", cogs: [10,11,12,13,14,15,17,19,21,24,28,33] },
+    { name: "10-36", cogs: [10,11,12,13,15,17,19,21,24,28,32,36] },
+  ]},
+  { group: "SRAM XPLR (gravel)", items: [
+    { name: "10-44", cogs: [10,11,13,15,17,19,21,24,28,32,38,44] },
+    { name: "Garbaruk 10-44", cogs: [10,11,12,13,15,17,19,22,25,31,37,44] },
+    { name: "10-46", cogs: [10,11,13,15,17,19,21,24,28,32,38,46] },
+  ]},
+  { group: "SRAM Eagle (mullet)", items: [
+    { name: "10-50", cogs: [10,12,14,16,18,21,24,28,32,36,42,50] },
+    { name: "10-52", cogs: [10,12,14,16,18,21,24,28,32,36,42,52] },
+  ]},
+];
+
+const SETUP_COLORS = ["#f2a900", "#4aa3ff"]; // A, B
+const SETUP_LETTERS = ["A", "B"];
+const SVGNS = "http://www.w3.org/2000/svg";
+
+/* ---------------------------- STATE ---------------------------- */
+const state = {
+  cadence: 100,
+  unit: "mph",
+  compare: false,
+  sort: "speed",   // "speed" | "gear"
+  setups: [
+    { mode: "2x", ringIdx: 2, ring1xIdx: 2, ringCustom: false, customRing2x: [50, 34], customRing1x: 40 },
+    { mode: "1x", ringIdx: 5, ring1xIdx: 2, ringCustom: false, customRing2x: [48, 32], customRing1x: 40 },
+  ],
+};
+// default cassette selection value per setup
+const DEFAULT_CASSETTE = ["Shimano 11-speed|11-30", "SRAM XPLR (gravel)|10-44"];
+
+/* ---------------------------- MATH ---------------------------- */
+function speed(ring, cog, circMm, rpm, unit) {
+  const ms = (ring / cog) * (circMm / 1000) * (rpm / 60);
+  return unit === "mph" ? ms * 2.236936 : ms * 3.6;
+}
+function unitLabel() { return state.unit === "mph" ? "mph" : "km/h"; }
+function getRpm() {
+  const c = state.cadence;
+  return { low: Math.max(1, c - 20), nom: c, high: c + 20 };
+}
+function clampNum(v, lo, hi, fallback) {
+  v = Number(v);
+  if (!isFinite(v) || v <= 0) return fallback;
+  return Math.min(hi, Math.max(lo, v));
+}
+function currentCirc() {
+  const v = el("tireSelect").value;
+  if (v === "custom") return clampNum(+el("customTireInput").value, 1000, 2400, 2155);
+  return TIRES[+v].mm;
+}
+function activeRings(i) {
+  const s = state.setups[i];
+  if (s.mode === "2x") {
+    if (s.ringCustom) {
+      const b = clampNum(s.customRing2x[0], 20, 70, 50);
+      const sm = clampNum(s.customRing2x[1], 20, 70, 34);
+      return b >= sm ? [b, sm] : [sm, b];
+    }
+    return CRANKSETS_2X[s.ringIdx].rings.slice();
+  }
+  if (s.ringCustom) return [clampNum(s.customRing1x, 20, 70, 40)];
+  return [RINGS_1X[s.ring1xIdx]];
+}
+function setupGears(i) {
+  const rings = activeRings(i);
+  const cogs = currentCassetteCogs(i);
+  const circ = currentCirc();
+  const rpm = getRpm();
+  const gears = [];
+  rings.forEach((r, ri) => cogs.forEach(c => {
+    gears.push({
+      ring: r, cog: c, ri,
+      low: speed(r, c, circ, rpm.low, state.unit),
+      nom: speed(r, c, circ, rpm.nom, state.unit),
+      high: speed(r, c, circ, rpm.high, state.unit),
+    });
+  }));
+  return { rings, cogs, gears };
+}
+function describeSetup(i) {
+  const s = state.setups[i];
+  const rings = activeRings(i);
+  const ringStr = s.mode === "2x" ? rings[0] + "/" + rings[1] : rings[0] + "T 1x";
+  const cs = el("cassetteSelect" + i);
+  const o = cs.options[cs.selectedIndex];
+  const casStr = (o && o.value === "custom") ? "custom cogs" : (o ? o.textContent : "");
+  return ringStr + " · " + casStr;
+}
+function computeMetrics(i) {
+  const { rings, cogs, gears } = setupGears(i);
+  const noms = gears.map(g => g.nom);
+  const ratios = gears.map(g => g.ring / g.cog);
+  return {
+    top: Math.max(...noms), easy: Math.min(...noms),
+    minR: Math.min(...ratios), maxR: Math.max(...ratios),
+    nGears: rings.length * cogs.length,
+  };
+}
+// Percentage jumps between consecutive gear ratios, easy→hard. In "realistic" sort the
+// steps come from the realistic shift sequence (overlaps/cross-chain dropped → bigger jumps);
+// otherwise from every unique ratio in the drivetrain.
+function stepsOf(i) {
+  let ratios;
+  if (state.sort === "realistic") {
+    ratios = realisticGears(i).map(g => g.ring / g.cog);
+  } else {
+    ratios = [...new Set(setupGears(i).gears.map(g => +(g.ring / g.cog).toFixed(4)))].sort((a, b) => a - b);
+  }
+  const steps = [];
+  for (let k = 1; k < ratios.length; k++) steps.push(ratios[k] / ratios[k - 1] - 1);
+  return steps;
+}
+// Mean % step for the easy / middle / hard third of the gear range.
+function thirds(steps) {
+  const seg = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length * 100 : null;
+  const n = steps.length;
+  if (!n) return { easy: null, mid: null, hard: null };
+  const t1 = Math.floor(n / 3), t2 = Math.floor(2 * n / 3);
+  return { easy: seg(steps.slice(0, t1)), mid: seg(steps.slice(t1, t2)), hard: seg(steps.slice(t2)) };
+}
+function pct(v) { return v == null ? "–" : v.toFixed(1) + "%"; }
+// Order a flat list of gear rows by current sort mode.
+function sortGears(arr) {
+  if (state.sort === "gear") arr.sort((a, b) => (a._set || 0) - (b._set || 0) || a.ri - b.ri || a.cog - b.cog);
+  else arr.sort((a, b) => a.nom - b.nom || (a._set || 0) - (b._set || 0));
+  return arr;
+}
+// Realistic single-shift sequence for a setup, easy→hard.
+// 2x: small ring covers the easier half of the ratio range, big ring the harder half,
+// split at the geometric midpoint. Cross-chained combos (small ring + smallest cogs,
+// big ring + largest cogs) fall outside their ring's half and are dropped. 1x: every cog.
+function realisticGears(i) {
+  const { rings, cogs, gears } = setupGears(i);
+  if (rings.length === 1) return gears.slice().sort((a, b) => a.ring / a.cog - b.ring / b.cog);
+  const big = rings[0], small = rings[1];
+  const minCog = Math.min(...cogs), maxCog = Math.max(...cogs);
+  const xc = Math.sqrt((small / maxCog) * (big / minCog)); // geometric midpoint of full 2x range
+  const kept = gears.filter(g => g.ri === 1 ? (g.ring / g.cog) <= xc : (g.ring / g.cog) > xc);
+  kept.sort((a, b) => a.ring / a.cog - b.ring / b.cog);
+  return kept;
+}
+// Gear list for a setup in the current sort order (used by the per-gear chart).
+function orderedGears(i) {
+  if (state.sort === "realistic") return realisticGears(i);
+  const g = setupGears(i).gears.slice();
+  if (state.sort === "gear") g.sort((a, b) => a.ri - b.ri || a.cog - b.cog);
+  else g.sort((a, b) => a.nom - b.nom);
+  return g;
+}
+
+/* ---------------------------- DOM HELPERS ---------------------------- */
+function el(id) { return document.getElementById(id); }
+function opt(text, val) { const o = document.createElement("option"); o.textContent = text; o.value = val; return o; }
+function svg(tag, attrs) { const e = document.createElementNS(SVGNS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; }
+function fmt(v) { return v.toFixed(1); }
+function esc(s) { return String(s).replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c])); }
+// Available drawing width for a chart host (so SVGs fit the screen on phones/tablets).
+function availW(hostId) {
+  const host = el(hostId);
+  const w = host ? (host.clientWidth || (host.parentElement && host.parentElement.clientWidth)) : 0;
+  return Math.max(300, w || 600);
+}
+
+/* ---------------------------- POPULATE SELECTS ---------------------------- */
+function populateTire() {
+  const s = el("tireSelect");
+  s.innerHTML = "";
+  TIRES.forEach((t, i) => s.appendChild(opt(t.name, i)));
+  s.appendChild(opt("Custom (mm)…", "custom"));
+  s.value = DEFAULT_TIRE;
+}
+function populateRing(i) {
+  const s = el("ringSelect" + i);
+  const su = state.setups[i];
+  s.innerHTML = "";
+  if (su.mode === "2x") {
+    el("ringLabel" + i).textContent = "Chainrings (2x)";
+    CRANKSETS_2X.forEach((c, k) => s.appendChild(opt(c.name, k)));
+    s.appendChild(opt("Custom…", "custom"));
+    s.value = su.ringIdx;
+  } else {
+    el("ringLabel" + i).textContent = "Chainring (1x)";
+    RINGS_1X.forEach((r, k) => s.appendChild(opt(r + "T", k)));
+    s.appendChild(opt("Custom…", "custom"));
+    s.value = su.ring1xIdx;
+  }
+  su.ringCustom = false;
+}
+function populateCassette(i) {
+  const s = el("cassetteSelect" + i);
+  s.innerHTML = "";
+  CASSETTES.forEach(g => {
+    const og = document.createElement("optgroup");
+    og.label = g.group;
+    g.items.forEach(it => {
+      const o = document.createElement("option");
+      o.value = g.group + "|" + it.name;
+      o.textContent = it.name;
+      o._cogs = it.cogs;
+      og.appendChild(o);
+    });
+    s.appendChild(og);
+  });
+  const og = document.createElement("optgroup");
+  og.label = "Custom";
+  const o = document.createElement("option");
+  o.value = "custom"; o.textContent = "Custom cogs…";
+  og.appendChild(o);
+  s.appendChild(og);
+}
+function currentCassetteCogs(i) {
+  const s = el("cassetteSelect" + i);
+  const o = s.options[s.selectedIndex];
+  if (o && o._cogs) return o._cogs;
+  if (o && o.value === "custom") return parseCustomCogs(i);
+  return [];
+}
+function parseCustomCogs(i) {
+  const raw = el("customCassetteInput" + i).value;
+  let cogs = raw.split(/[^0-9]+/).map(Number).filter(n => n >= 5 && n <= 60);
+  cogs = [...new Set(cogs)].sort((a, b) => a - b);
+  return cogs.length ? cogs : [11, 13, 15, 18, 21, 24, 28, 32];
+}
+
+/* ---------------------------- BUILD SETUP BLOCKS ---------------------------- */
+function buildSetupBlocks() {
+  const host = el("setupBlocks");
+  host.innerHTML = "";
+  [0, 1].forEach(i => {
+    const color = SETUP_COLORS[i];
+    const block = document.createElement("div");
+    block.className = "setup-block";
+    block.dataset.setup = i;
+    block.innerHTML =
+      '<div class="setup-head">' +
+        '<span class="chip" style="background:' + color + '">' + SETUP_LETTERS[i] + '</span>' +
+        '<span class="setup-desc" id="setupDesc' + i + '"></span>' +
+      '</div>' +
+      '<div class="controls">' +
+        '<div class="field"><label>Drivetrain</label>' +
+          '<div class="toggle-group" id="modeToggle' + i + '">' +
+            '<button data-mode="2x">2x</button><button data-mode="1x">1x</button>' +
+          '</div></div>' +
+        '<div class="field"><label id="ringLabel' + i + '">Chainrings</label>' +
+          '<select id="ringSelect' + i + '"></select></div>' +
+        '<div class="field" id="customRingField' + i + '" style="display:none">' +
+          '<label>Custom rings (T)</label><div class="custom-row" id="customRingInputs' + i + '"></div></div>' +
+        '<div class="field"><label>Cassette</label>' +
+          '<select id="cassetteSelect' + i + '"></select></div>' +
+        '<div class="field" id="customCassetteField' + i + '" style="display:none">' +
+          '<label>Custom cogs (comma-sep)</label>' +
+          '<input type="text" id="customCassetteInput' + i + '" value="11,13,15,18,21,24,28,32" placeholder="e.g. 11,13,15,18,21,24,28"></div>' +
+      '</div>';
+    host.appendChild(block);
+  });
+}
+function setModeButtons(i) {
+  const mt = el("modeToggle" + i);
+  [...mt.children].forEach(b => b.classList.toggle("active", b.dataset.mode === state.setups[i].mode));
+}
+function updateCustomVisibility(i) {
+  const su = state.setups[i];
+  el("customRingField" + i).style.display = su.ringCustom ? "" : "none";
+  el("customCassetteField" + i).style.display = el("cassetteSelect" + i).value === "custom" ? "" : "none";
+  if (su.ringCustom) buildCustomRingInputs(i);
+}
+function buildCustomRingInputs(i) {
+  const su = state.setups[i];
+  const host = el("customRingInputs" + i);
+  host.innerHTML = "";
+  const specs = su.mode === "2x"
+    ? [{ lbl: "Big", val: su.customRing2x[0] }, { lbl: "Small", val: su.customRing2x[1] }]
+    : [{ lbl: "Ring", val: su.customRing1x }];
+  specs.forEach((spec, k) => {
+    const wrap = document.createElement("div");
+    wrap.className = "ci";
+    const span = document.createElement("span"); span.textContent = spec.lbl;
+    const inp = document.createElement("input");
+    inp.type = "number"; inp.min = "20"; inp.max = "70"; inp.value = spec.val;
+    inp.addEventListener("input", () => {
+      const n = +inp.value;
+      if (su.mode === "2x") su.customRing2x[k] = n; else su.customRing1x = n;
+      render();
+    });
+    wrap.appendChild(span); wrap.appendChild(inp);
+    host.appendChild(wrap);
+  });
+}
+
+/* ---------------------------- RENDER ---------------------------- */
+function render() {
+  updateLabels();
+  el("statsPanel").style.display = state.compare ? "none" : "";
+  if (!state.compare) renderStats(0);
+  renderLegend();
+  renderChart1();
+  renderChart2();
+  renderTable();
+  // update setup descriptions
+  [0, 1].forEach(i => { const d = el("setupDesc" + i); if (d) d.textContent = describeSetup(i); });
+}
+
+function updateLabels() {
+  const r = getRpm();
+  el("subHeader").innerHTML = "Speed for each chainring × cassette-cog combo at <strong>" +
+    r.nom + "&nbsp;RPM</strong>. Error bars span <strong>" + r.low + "–" + r.high + "&nbsp;RPM</strong>.";
+  el("statsSub").textContent = "@ " + r.nom + " RPM";
+  const seqMode = state.sort === "realistic" || state.compare;
+  const seqLabel = state.sort === "realistic" ? "realistic shift sequence"
+    : state.sort === "gear" ? "gear sequence" : "ranked by speed";
+  el("chart1Sub").textContent = (seqMode ? seqLabel + " · " : "") +
+    "marker = " + r.nom + " RPM, bars = " + r.low + "–" + r.high + " RPM";
+  const sortTxt = state.sort === "realistic" ? "as realistic shift sequence"
+    : state.sort === "gear" ? "by gear sequence" : "by speed";
+  el("chart2Sub").textContent = "each bar = " + r.low + "–" + r.high + " RPM range, sorted " + sortTxt;
+
+  const an = el("assumeNote");
+  if (state.sort === "realistic") {
+    an.style.display = "";
+    an.innerHTML = "<b>Realistic shift assumption:</b> for 2x, the small ring covers the easier half of " +
+      "the gear range and the big ring the harder half, split at the geometric midpoint — modeling a single " +
+      "front shift. Cross-chained combos (small ring + smallest cogs, big ring + largest cogs) are dropped, " +
+      "so the jumps shown reflect real-world shifting. 1x uses every cog.";
+  } else {
+    an.style.display = "none";
+  }
+  el("tableSub").textContent = state.compare
+    ? "A vs B metrics, then full grids @ " + r.nom + " RPM"
+    : "speed @ " + r.nom + " RPM · ± = swing per ±20 RPM · ratio";
+}
+
+function renderStats(i) {
+  const { rings, cogs } = setupGears(i);
+  const m = computeMetrics(i);
+  const u = unitLabel();
+  const stats = [
+    { k: "Top speed", v: fmt(m.top), u: u },
+    { k: "Easiest gear", v: fmt(m.easy), u: u },
+    { k: "Gear ratio range", v: m.minR.toFixed(2) + "–" + m.maxR.toFixed(2), u: "" },
+    { k: "Gear combinations", v: String(m.nGears), u: rings.length + "×" + cogs.length },
+  ];
+  const box = el("stats");
+  box.innerHTML = "";
+  stats.forEach(s => {
+    const d = document.createElement("div");
+    d.className = "stat";
+    d.innerHTML = '<div class="k">' + s.k + '</div><div class="v">' + s.v + (s.u ? ' <small>' + s.u + '</small>' : '') + '</div>';
+    box.appendChild(d);
+  });
+}
+
+function renderLegend() {
+  let html = "";
+  if (state.compare) {
+    html = [0, 1].map(i =>
+      '<span><span class="dot" style="background:' + SETUP_COLORS[i] + '"></span>' +
+      SETUP_LETTERS[i] + ': ' + esc(describeSetup(i)) + '</span>'
+    ).join("") + '<span><span class="ebar"></span>RPM range</span>';
+  } else {
+    const rings = activeRings(0);
+    if (state.setups[0].mode === "2x") {
+      html = '<span><span class="dot" style="background:var(--accent)"></span>Big ring (' + rings[0] + 'T)</span>' +
+             '<span><span class="dot" style="background:var(--accent2)"></span>Small ring (' + rings[1] + 'T)</span>' +
+             '<span><span class="ebar"></span>RPM range</span>';
+    } else {
+      html = '<span><span class="dot" style="background:var(--accent)"></span>' + rings[0] + 'T ring</span>' +
+             '<span><span class="ebar"></span>RPM range</span>';
+    }
+  }
+  el("legend1").innerHTML = html;
+  el("legend2").innerHTML = html;
+}
+
+/* ---- Chart 1 ---- */
+function renderChart1() {
+  // Sequence chart whenever comparing or in realistic mode; otherwise the single cog chart.
+  if (state.sort === "realistic" || state.compare) renderChart1Seq(state.compare ? [0, 1] : [0]);
+  else renderChart1Single(0);
+}
+
+function renderChart1Single(si) {
+  const host = el("chart1"); host.innerHTML = "";
+  const rings = activeRings(si), cogs = currentCassetteCogs(si), circ = currentCirc(), rpm = getRpm();
+  if (!cogs.length || !rings.length) return;
+  const m = { t: 16, r: 16, b: 46, l: 52 };
+  const H = 340;
+  const W = Math.max(availW("chart1"), cogs.length * 46 + m.l + m.r);
+  const iw = W - m.l - m.r, ih = H - m.t - m.b;
+  const s = svg("svg", { viewBox: "0 0 " + W + " " + H, width: W, height: H });
+
+  let maxV = 0;
+  rings.forEach(r => cogs.forEach(c => { maxV = Math.max(maxV, speed(r, c, circ, rpm.high, state.unit)); }));
+  const yMax = Math.ceil(maxV / 5) * 5 || 5;
+  const x = i => m.l + (cogs.length === 1 ? iw / 2 : (i / (cogs.length - 1)) * iw);
+  const y = v => m.t + ih - (v / yMax) * ih;
+
+  drawYAxis(s, m, iw, ih, yMax, 6);
+  cogs.forEach((c, i) => { const tx = svg("text", { x: x(i), y: m.t + ih + 18, "text-anchor": "middle" }); tx.textContent = c + "T"; s.appendChild(tx); });
+  const xl = svg("text", { x: m.l + iw / 2, y: H - 6, "text-anchor": "middle" }); xl.textContent = "Cassette cog (teeth)"; s.appendChild(xl);
+
+  rings.forEach((r, ri) => {
+    const col = ri === 0 ? "#f2a900" : "#4aa3ff";
+    let dpath = "";
+    cogs.forEach((c, i) => { dpath += (i === 0 ? "M" : "L") + x(i) + " " + y(speed(r, c, circ, rpm.nom, state.unit)) + " "; });
+    s.appendChild(svg("path", { d: dpath, fill: "none", stroke: col, "stroke-width": 2, opacity: .55 }));
+    cogs.forEach((c, i) => {
+      const xx = x(i), yLow = y(speed(r, c, circ, rpm.low, state.unit)), yHigh = y(speed(r, c, circ, rpm.high, state.unit)), yNom = y(speed(r, c, circ, rpm.nom, state.unit));
+      errorBar(s, xx, yLow, yHigh, col);
+      const dot = svg("circle", { cx: xx, cy: yNom, r: 4.5, fill: col, stroke: "#0f1419", "stroke-width": 1.5 });
+      attachTip(dot, () =>
+        (state.setups[si].mode === "2x" ? (ri === 0 ? "Big " : "Small ") : "") + r + "T × " + c + "T<br>" +
+        rpm.nom + " RPM: <b>" + fmt(speed(r, c, circ, rpm.nom, state.unit)) + " " + unitLabel() + "</b><br>" +
+        rpm.low + "–" + rpm.high + ": " + fmt(speed(r, c, circ, rpm.low, state.unit)) + "–" + fmt(speed(r, c, circ, rpm.high, state.unit)) + "<br>ratio " + (r / c).toFixed(2));
+      s.appendChild(dot);
+    });
+  });
+  host.appendChild(s);
+}
+
+function renderChart1Seq(idxs) {
+  const host = el("chart1"); host.innerHTML = "";
+  const sets = idxs.map(i => ({ i, sorted: orderedGears(i) }));
+  const maxRank = Math.max(...sets.map(s => s.sorted.length), 0);
+  if (!maxRank) return;
+  let maxV = 0; sets.forEach(s => s.sorted.forEach(g => maxV = Math.max(maxV, g.high)));
+  const yMax = Math.ceil(maxV / 5) * 5 || 5;
+
+  const m = { t: 16, r: 16, b: 46, l: 52 };
+  const H = 340;
+  const W = Math.max(availW("chart1"), maxRank * 40 + m.l + m.r);
+  const iw = W - m.l - m.r, ih = H - m.t - m.b;
+  const s = svg("svg", { viewBox: "0 0 " + W + " " + H, width: W, height: H });
+  const x = r => m.l + (maxRank === 1 ? iw / 2 : (r / (maxRank - 1)) * iw);
+  const y = v => m.t + ih - (v / yMax) * ih;
+
+  drawYAxis(s, m, iw, ih, yMax, 6);
+  // x ticks: gear numbers
+  for (let r = 0; r < maxRank; r++) { const tx = svg("text", { x: x(r), y: m.t + ih + 18, "text-anchor": "middle" }); tx.textContent = (r + 1); s.appendChild(tx); }
+  const xl = svg("text", { x: m.l + iw / 2, y: H - 6, "text-anchor": "middle" });
+  xl.textContent = state.sort === "realistic" ? "Realistic gear sequence (easiest → hardest)"
+    : state.sort === "gear" ? "Gear sequence (per ring: small → big cog)"
+    : "Gear rank (easiest → hardest)";
+  s.appendChild(xl);
+
+  sets.forEach(set => {
+    const col = SETUP_COLORS[set.i];
+    let dpath = "";
+    set.sorted.forEach((g, r) => { dpath += (r === 0 ? "M" : "L") + x(r) + " " + y(g.nom) + " "; });
+    s.appendChild(svg("path", { d: dpath, fill: "none", stroke: col, "stroke-width": 2, opacity: .6 }));
+    set.sorted.forEach((g, r) => {
+      const xx = x(r);
+      errorBar(s, xx, y(g.low), y(g.high), col);
+      const dot = svg("circle", { cx: xx, cy: y(g.nom), r: 4, fill: col, stroke: "#0f1419", "stroke-width": 1.5 });
+      attachTip(dot, () =>
+        (state.compare ? SETUP_LETTERS[set.i] + " · " : "") + "gear " + (r + 1) + ": " + g.ring + "T × " + g.cog + "T<br>" +
+        getRpm().nom + " RPM: <b>" + fmt(g.nom) + " " + unitLabel() + "</b><br>" +
+        getRpm().low + "–" + getRpm().high + ": " + fmt(g.low) + "–" + fmt(g.high) + "<br>ratio " + (g.ring / g.cog).toFixed(2));
+      s.appendChild(dot);
+    });
+  });
+  host.appendChild(s);
+}
+
+/* ---- Chart 2: gear ladder / overlap ---- */
+function renderChart2() {
+  const host = el("chart2"); host.innerHTML = "";
+  // build rows
+  let rows = [];
+  const idxs = state.compare ? [0, 1] : [0];
+  idxs.forEach(i => {
+    const rings = activeRings(i);
+    const src = state.sort === "realistic" ? realisticGears(i) : setupGears(i).gears;
+    src.forEach(g => rows.push({
+      label: state.compare ? (SETUP_LETTERS[i] + " " + g.ring + "×" + g.cog) : (g.ring + "×" + g.cog),
+      color: state.compare ? SETUP_COLORS[i] : (g.ri === 0 ? "#f2a900" : "#4aa3ff"),
+      low: g.low, nom: g.nom, high: g.high, ring: g.ring, cog: g.cog,
+      tag: state.compare ? SETUP_LETTERS[i] : (rings.length > 1 ? (g.ri === 0 ? "Big" : "Small") : ""),
+      ri: g.ri, _set: i
+    }));
+  });
+  if (!rows.length) return;
+  // realistic sequence is already monotonic in speed; order by speed, else by current sort
+  if (state.sort === "realistic") rows.sort((a, b) => a.nom - b.nom || (a._set || 0) - (b._set || 0));
+  else sortGears(rows);
+
+  const rowH = 20, m = { t: 12, r: 20, b: 36, l: 104 };
+  const W = Math.max(360, availW("chart2")), H = m.t + m.b + rows.length * rowH;
+  const iw = W - m.l - m.r, ih = rows.length * rowH;
+  const s = svg("svg", { viewBox: "0 0 " + W + " " + H, width: W, height: H });
+
+  const maxV = Math.max(...rows.map(r => r.high));
+  const xMax = Math.ceil(maxV / 5) * 5 || 5;
+  const x = v => m.l + (v / xMax) * iw;
+
+  const ticks = 8;
+  for (let t = 0; t <= ticks; t++) {
+    const val = (xMax / ticks) * t, xx = x(val);
+    s.appendChild(svg("line", { class: "grid-line", x1: xx, y1: m.t, x2: xx, y2: m.t + ih }));
+    const tx = svg("text", { x: xx, y: m.t + ih + 16, "text-anchor": "middle" }); tx.textContent = Math.round(val); s.appendChild(tx);
+  }
+  const xl = svg("text", { x: m.l + iw / 2, y: H - 4, "text-anchor": "middle" }); xl.textContent = "Speed (" + unitLabel() + ")"; s.appendChild(xl);
+
+  rows.forEach((g, i) => {
+    const yc = m.t + i * rowH + rowH / 2;
+    const bx = x(g.low), bw = Math.max(2, x(g.high) - x(g.low));
+    s.appendChild(svg("rect", { x: bx, y: yc - 5, width: bw, height: 10, rx: 5, fill: g.color, opacity: .35 }));
+    s.appendChild(svg("line", { x1: x(g.nom), y1: yc - 7, x2: x(g.nom), y2: yc + 7, stroke: g.color, "stroke-width": 2.5 }));
+    const lab = svg("text", { x: m.l - 8, y: yc + 4, "text-anchor": "end", fill: g.color }); lab.textContent = g.label; s.appendChild(lab);
+    const hit = svg("rect", { x: m.l, y: yc - rowH / 2, width: iw, height: rowH, fill: "transparent" });
+    attachTip(hit, () =>
+      (g.tag ? g.tag + " · " : "") + g.ring + "T × " + g.cog + "T · ratio " + (g.ring / g.cog).toFixed(2) + "<br>" +
+      getRpm().nom + " RPM: <b>" + fmt(g.nom) + " " + unitLabel() + "</b><br>" +
+      getRpm().low + "–" + getRpm().high + ": " + fmt(g.low) + "–" + fmt(g.high));
+    s.appendChild(hit);
+  });
+  host.appendChild(s);
+}
+
+/* ---- Table ---- */
+function renderTable() {
+  const host = el("table");
+  if (!state.compare) { host.innerHTML = gridHTML(0); return; }
+  host.innerHTML = metricsHTML() +
+    '<h3 class="setup-title"><span class="chip" style="background:' + SETUP_COLORS[0] + '">A</span>' + esc(describeSetup(0)) + '</h3>' + gridHTML(0) +
+    '<h3 class="setup-title"><span class="chip" style="background:' + SETUP_COLORS[1] + '">B</span>' + esc(describeSetup(1)) + '</h3>' + gridHTML(1);
+}
+
+function gridHTML(i) {
+  const rings = activeRings(i), cogs = currentCassetteCogs(i), circ = currentCirc(), rpm = getRpm();
+  if (!rings.length || !cogs.length) return "";
+  let lo = Infinity, hi = -Infinity;
+  rings.forEach(r => cogs.forEach(c => { const v = speed(r, c, circ, rpm.nom, state.unit); lo = Math.min(lo, v); hi = Math.max(hi, v); }));
+
+  let html = '<div class="table-scroll"><table><thead><tr><th>Cog</th>';
+  rings.forEach((r, ri) => { const tag = state.setups[i].mode === "2x" ? (ri === 0 ? "Big " : "Small ") : ""; html += "<th>" + tag + r + "T</th>"; });
+  html += "</tr></thead><tbody>";
+  cogs.forEach(c => {
+    html += "<tr><th>" + c + "T</th>";
+    rings.forEach(r => {
+      const v = speed(r, c, circ, rpm.nom, state.unit);
+      const pm = v * 20 / state.cadence;
+      let cls = "";
+      if (Math.abs(v - hi) < 1e-6) cls = "cell-max";
+      else if (Math.abs(v - lo) < 1e-6) cls = "cell-min";
+      html += '<td class="' + cls + '"><span class="sp">' + fmt(v) + '</span>' +
+              '<span class="pm">±' + fmt(pm) + '</span>' +
+              '<span class="ratio">' + (r / c).toFixed(2) + '</span></td>';
+    });
+    html += "</tr>";
+  });
+  html += "</tbody></table></div>";
+  const t = thirds(stepsOf(i));
+  const lead = state.sort === "realistic" ? "Realistic avg step" : "Avg gear-ratio step";
+  html += '<div class="step-note">' + lead + ' — easy ⅓: <b>' + pct(t.easy) +
+          '</b> · middle ⅓: <b>' + pct(t.mid) + '</b> · hard ⅓: <b>' + pct(t.hard) + '</b></div>';
+  return html;
+}
+
+function metricsHTML() {
+  const u = unitLabel();
+  const mA = computeMetrics(0), mB = computeMetrics(1);
+  const tA = thirds(stepsOf(0)), tB = thirds(stepsOf(1));
+  const rows = [
+    ["Top speed", fmt(mA.top) + " " + u, fmt(mB.top) + " " + u],
+    ["Easiest gear", fmt(mA.easy) + " " + u, fmt(mB.easy) + " " + u],
+    ["Speed range", fmt(mA.easy) + "–" + fmt(mA.top), fmt(mB.easy) + "–" + fmt(mB.top)],
+    ["Gear ratio range", mA.minR.toFixed(2) + "–" + mA.maxR.toFixed(2), mB.minR.toFixed(2) + "–" + mB.maxR.toFixed(2)],
+    ["Gear combinations", String(mA.nGears), String(mB.nGears)],
+    ["Avg step · easy ⅓", pct(tA.easy), pct(tB.easy)],
+    ["Avg step · middle ⅓", pct(tA.mid), pct(tB.mid)],
+    ["Avg step · hard ⅓", pct(tA.hard), pct(tB.hard)],
+  ];
+  let html = '<div class="table-scroll"><table class="metrics"><thead><tr><th>Metric</th>' +
+    '<th class="setcol" style="background:' + SETUP_COLORS[0] + '">A · ' + esc(describeSetup(0)) + '</th>' +
+    '<th class="setcol" style="background:' + SETUP_COLORS[1] + '">B · ' + esc(describeSetup(1)) + '</th></tr></thead><tbody>';
+  rows.forEach(r => { html += "<tr><th>" + r[0] + "</th><td>" + r[1] + "</td><td>" + r[2] + "</td></tr>"; });
+  html += "</tbody></table></div>";
+  return html;
+}
+
+/* ---------------------------- SVG SHARED HELPERS ---------------------------- */
+function drawYAxis(s, m, iw, ih, yMax, ticks) {
+  for (let t = 0; t <= ticks; t++) {
+    const val = (yMax / ticks) * t, yy = m.t + ih - (val / yMax) * ih;
+    s.appendChild(svg("line", { class: "grid-line", x1: m.l, y1: yy, x2: m.l + iw, y2: yy }));
+    const tx = svg("text", { x: m.l - 8, y: yy + 4, "text-anchor": "end" }); tx.textContent = Math.round(val); s.appendChild(tx);
+  }
+  s.appendChild(svg("line", { class: "axis-line", x1: m.l, y1: m.t, x2: m.l, y2: m.t + ih }));
+  s.appendChild(svg("line", { class: "axis-line", x1: m.l, y1: m.t + ih, x2: m.l + iw, y2: m.t + ih }));
+  const yl = svg("text", { x: -(m.t + ih / 2), y: 14, transform: "rotate(-90)", "text-anchor": "middle" });
+  yl.textContent = "Speed (" + unitLabel() + ")"; s.appendChild(yl);
+}
+function errorBar(s, xx, yLow, yHigh, col) {
+  s.appendChild(svg("line", { x1: xx, y1: yLow, x2: xx, y2: yHigh, stroke: col, "stroke-width": 2, opacity: .85 }));
+  s.appendChild(svg("line", { x1: xx - 4, y1: yHigh, x2: xx + 4, y2: yHigh, stroke: col, "stroke-width": 2 }));
+  s.appendChild(svg("line", { x1: xx - 4, y1: yLow, x2: xx + 4, y2: yLow, stroke: col, "stroke-width": 2 }));
+}
+
+/* ---------------------------- TOOLTIP ---------------------------- */
+const tip = el("tip");
+function showTip(html, x, y) {
+  tip.innerHTML = html;
+  tip.style.opacity = "1";
+  // keep the tooltip on-screen
+  const w = window.innerWidth;
+  tip.style.left = Math.min(x + 14, w - 12) + "px";
+  tip.style.top = Math.max(8, y - 10) + "px";
+}
+function attachTip(node, htmlFn) {
+  node.style.cursor = "pointer";
+  node.addEventListener("mousemove", e => showTip(htmlFn(), e.clientX, e.clientY + 24));
+  node.addEventListener("mouseleave", () => { tip.style.opacity = "0"; });
+  node.addEventListener("touchstart", e => {
+    const t = e.touches[0]; showTip(htmlFn(), t.clientX, t.clientY);
+    clearTimeout(tip._t); tip._t = setTimeout(() => { tip.style.opacity = "0"; }, 2500);
+  }, { passive: true });
+}
+
+/* ---------------------------- EVENTS ---------------------------- */
+function bind() {
+  // re-fit charts to the viewport on resize / orientation change
+  let resizeT;
+  window.addEventListener("resize", () => { clearTimeout(resizeT); resizeT = setTimeout(render, 150); });
+  // compare toggle
+  el("compareToggle").addEventListener("click", e => {
+    const b = e.target.closest("button"); if (!b) return;
+    state.compare = b.dataset.cmp === "compare";
+    [...el("compareToggle").children].forEach(x => x.classList.toggle("active", x === b));
+    el("setupBlocks").classList.toggle("cmp", state.compare);
+    render();
+  });
+  // sort toggle
+  el("sortToggle").addEventListener("click", e => {
+    const b = e.target.closest("button"); if (!b) return;
+    state.sort = b.dataset.sort;
+    [...el("sortToggle").children].forEach(x => x.classList.toggle("active", x === b));
+    render();
+  });
+  // cadence (slider + number kept in sync)
+  function setCadence(v) {
+    v = clampNum(v, 40, 140, 100);
+    state.cadence = v;
+    el("cadenceRange").value = v; el("cadenceNum").value = v;
+    render();
+  }
+  el("cadenceRange").addEventListener("input", e => setCadence(+e.target.value));
+  el("cadenceNum").addEventListener("input", e => setCadence(+e.target.value));
+  // units
+  el("unitToggle").addEventListener("click", e => {
+    const b = e.target.closest("button"); if (!b) return;
+    state.unit = b.dataset.unit;
+    [...el("unitToggle").children].forEach(x => x.classList.toggle("active", x === b));
+    render();
+  });
+  // tire
+  el("tireSelect").addEventListener("input", () => {
+    el("customTireField").style.display = el("tireSelect").value === "custom" ? "" : "none";
+    render();
+  });
+  el("customTireInput").addEventListener("input", render);
+  // per-setup controls
+  [0, 1].forEach(i => bindSetup(i));
+}
+
+function bindSetup(i) {
+  const su = state.setups[i];
+  el("modeToggle" + i).addEventListener("click", e => {
+    const b = e.target.closest("button"); if (!b) return;
+    su.mode = b.dataset.mode;
+    setModeButtons(i);
+    populateRing(i);
+    updateCustomVisibility(i);
+    render();
+  });
+  el("ringSelect" + i).addEventListener("input", e => {
+    const v = e.target.value;
+    if (v === "custom") su.ringCustom = true;
+    else { su.ringCustom = false; if (su.mode === "2x") su.ringIdx = +v; else su.ring1xIdx = +v; }
+    updateCustomVisibility(i);
+    render();
+  });
+  el("cassetteSelect" + i).addEventListener("input", () => { updateCustomVisibility(i); render(); });
+  el("customCassetteInput" + i).addEventListener("input", render);
+}
+
+/* ---------------------------- INIT ---------------------------- */
+function init() {
+  populateTire();
+  buildSetupBlocks();
+  [0, 1].forEach(i => {
+    setModeButtons(i);
+    populateRing(i);
+    populateCassette(i);
+    const cs = el("cassetteSelect" + i);
+    for (let k = 0; k < cs.options.length; k++) {
+      if (cs.options[k].value === DEFAULT_CASSETTE[i]) { cs.selectedIndex = k; break; }
+    }
+  });
+  bind();
+  [0, 1].forEach(updateCustomVisibility);
+  render();
+}
+init();
+</script>
+</body>
+</html>
