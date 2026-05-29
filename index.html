@@ -100,15 +100,14 @@
 
   /* Setup blocks */
   .setup-block { border-left: 3px solid transparent; border-radius: 2px; }
-  #setupBlocks.cmp .setup-block { padding-left: 14px; margin-bottom: 18px; }
-  #setupBlocks.cmp .setup-block[data-setup="0"] { border-left-color: var(--accent); }
-  #setupBlocks.cmp .setup-block[data-setup="1"] { border-left-color: var(--accent2); }
+  .setup-block.cmp { padding-left: 14px; margin-bottom: 18px; }
   .setup-head { display: none; align-items: center; gap: 10px; margin-bottom: 12px; }
-  #setupBlocks.cmp .setup-head { display: flex; }
   .chip { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 7px; font-weight: 800; font-size: .82rem; color: #0f1419; }
   .setup-desc { color: var(--muted); font-size: .9rem; }
-  .setup-block[data-setup="1"] { display: none; }
-  #setupBlocks.cmp .setup-block[data-setup="1"] { display: block; }
+  .remove-setup { margin-left: auto; background: transparent; border: 1px solid var(--line); color: var(--muted); width: 26px; height: 26px; border-radius: 7px; cursor: pointer; font-size: 1.1rem; line-height: 1; }
+  .remove-setup:hover { color: var(--bad); border-color: var(--bad); }
+  .add-setup { margin-top: 4px; background: var(--panel-2); border: 1px dashed var(--line); color: var(--text); padding: 10px 16px; border-radius: 9px; cursor: pointer; font-size: .9rem; font-weight: 600; }
+  .add-setup:hover { border-color: var(--accent); color: var(--accent); }
 
   .legend { display: flex; gap: 18px; flex-wrap: wrap; align-items: center; font-size: .85rem; color: var(--muted); margin-bottom: 6px; }
   .legend:empty { display: none; }
@@ -238,6 +237,7 @@
     </div>
 
     <div id="setupBlocks"></div>
+    <button class="add-setup" id="addSetupBtn" style="display:none">+ Add comparison</button>
   </section>
 
   <!-- CLIMBING POWER CONFIG (climb tab only) -->
@@ -389,8 +389,9 @@ const CASSETTES = [
   ]},
 ];
 
-const SETUP_COLORS = ["#f2a900", "#4aa3ff"]; // A, B
-const SETUP_LETTERS = ["A", "B"];
+const SETUP_COLORS = ["#f2a900", "#4aa3ff", "#b07cff", "#ff7ab6", "#5ad1c7", "#ff9d4a"]; // A–F
+const SETUP_LETTERS = ["A", "B", "C", "D", "E", "F"];
+const MAX_SETUPS = SETUP_COLORS.length;
 const SVGNS = "http://www.w3.org/2000/svg";
 
 // Climbing-power presets
@@ -418,12 +419,13 @@ const state = {
   tab: "speed",    // "speed" | "climb"
   climb: { grade: 6, weightKg: 80, weightUnit: "kg", rho: 1.225, eff: 97.5, target: 250 },
   setups: [
-    { mode: "2x", ringIdx: 2, ring1xIdx: 2, ringCustom: false, customRing2x: [50, 34], customRing1x: 40 },
-    { mode: "1x", ringIdx: 5, ring1xIdx: 2, ringCustom: false, customRing2x: [48, 32], customRing1x: 40 },
+    { mode: "2x", ringIdx: 2, ring1xIdx: 2, ringCustom: false, customRing2x: [50, 34], customRing1x: 40, cassetteValue: "Shimano 11-speed|11-30", customCogsStr: "11,13,15,18,21,24,28,32" },
+    { mode: "1x", ringIdx: 5, ring1xIdx: 2, ringCustom: false, customRing2x: [48, 32], customRing1x: 40, cassetteValue: "SRAM XPLR (gravel)|10-44", customCogsStr: "11,13,15,18,21,24,28,32" },
   ],
 };
-// default cassette selection value per setup
-const DEFAULT_CASSETTE = ["Shimano 11-speed|11-30", "SRAM XPLR (gravel)|10-44"];
+function newSetup() {
+  return { mode: "2x", ringIdx: 2, ring1xIdx: 2, ringCustom: false, customRing2x: [50, 34], customRing1x: 40, cassetteValue: "Shimano 11-speed|11-30", customCogsStr: "11,13,15,18,21,24,28,32" };
+}
 
 /* ---------------------------- MATH ---------------------------- */
 function speed(ring, cog, circMm, rpm, unit) {
@@ -467,6 +469,7 @@ function watts(vMs) {
   const P = m * g * vMs * (Math.sin(theta) + crr * Math.cos(theta)) + 0.5 * rho * cda * vMs * vMs * vMs;
   return Math.max(0, P / eff); // clamp ≥ 0 (coasting on descents)
 }
+function activeIdxs() { return state.compare ? state.setups.map((_, i) => i) : [0]; }
 function activeRings(i) {
   const s = state.setups[i];
   if (s.mode === "2x") {
@@ -607,14 +610,13 @@ function populateRing(i) {
     el("ringLabel" + i).textContent = "Chainrings (2x)";
     CRANKSETS_2X.forEach((c, k) => s.appendChild(opt(c.name, k)));
     s.appendChild(opt("Custom…", "custom"));
-    s.value = su.ringIdx;
+    s.value = su.ringCustom ? "custom" : su.ringIdx;
   } else {
     el("ringLabel" + i).textContent = "Chainring (1x)";
     RINGS_1X.forEach((r, k) => s.appendChild(opt(r + "T", k)));
     s.appendChild(opt("Custom…", "custom"));
-    s.value = su.ring1xIdx;
+    s.value = su.ringCustom ? "custom" : su.ring1xIdx;
   }
-  su.ringCustom = false;
 }
 function populateCassette(i) {
   const s = el("cassetteSelect" + i);
@@ -637,6 +639,12 @@ function populateCassette(i) {
   o.value = "custom"; o.textContent = "Custom cogs…";
   og.appendChild(o);
   s.appendChild(og);
+  // restore selection + custom cogs from state
+  const su = state.setups[i];
+  if ([...s.options].some(op => op.value === su.cassetteValue)) s.value = su.cassetteValue;
+  else { s.selectedIndex = 0; su.cassetteValue = s.value; }
+  const ci = el("customCassetteInput" + i);
+  if (ci) ci.value = su.customCogsStr;
 }
 function currentCassetteCogs(i) {
   const s = el("cassetteSelect" + i);
@@ -679,7 +687,7 @@ function displayWeight() {
 function buildSetupBlocks() {
   const host = el("setupBlocks");
   host.innerHTML = "";
-  [0, 1].forEach(i => {
+  state.setups.forEach((su, i) => {
     const color = SETUP_COLORS[i];
     const block = document.createElement("div");
     block.className = "setup-block";
@@ -688,6 +696,7 @@ function buildSetupBlocks() {
       '<div class="setup-head">' +
         '<span class="chip" style="background:' + color + '">' + SETUP_LETTERS[i] + '</span>' +
         '<span class="setup-desc" id="setupDesc' + i + '"></span>' +
+        '<button class="remove-setup" data-remove="' + i + '" title="Remove this comparison">×</button>' +
       '</div>' +
       '<div class="controls">' +
         '<div class="field"><label>Drivetrain</label>' +
@@ -706,6 +715,45 @@ function buildSetupBlocks() {
       '</div>';
     host.appendChild(block);
   });
+}
+// Build all setup blocks, populate/restore/bind each, and set visibility. Called on
+// init and whenever a comparison is added/removed.
+function rebuildSetups() {
+  buildSetupBlocks();
+  state.setups.forEach((su, i) => {
+    setModeButtons(i);
+    populateRing(i);
+    populateCassette(i);
+    bindSetup(i);
+    updateCustomVisibility(i);
+  });
+  updateSetupVisibility();
+}
+function updateSetupVisibility() {
+  const blocks = el("setupBlocks").children;
+  state.setups.forEach((su, i) => {
+    const block = blocks[i];
+    if (!block) return;
+    block.style.display = (state.compare || i === 0) ? "" : "none";
+    block.classList.toggle("cmp", state.compare);
+    block.style.borderLeftColor = state.compare ? SETUP_COLORS[i] : "transparent";
+    block.querySelector(".setup-head").style.display = state.compare ? "flex" : "none";
+    const rm = block.querySelector(".remove-setup");
+    rm.style.display = (state.compare && state.setups.length > 2) ? "" : "none";
+  });
+  el("addSetupBtn").style.display = (state.compare && state.setups.length < MAX_SETUPS) ? "" : "none";
+}
+function addSetup() {
+  if (state.setups.length >= MAX_SETUPS) return;
+  state.setups.push(newSetup());
+  rebuildSetups();
+  render();
+}
+function removeSetup(i) {
+  if (state.setups.length <= 2) return;
+  state.setups.splice(i, 1);
+  rebuildSetups();
+  render();
 }
 function setModeButtons(i) {
   const mt = el("modeToggle" + i);
@@ -754,7 +802,7 @@ function render() {
   renderChart2();
   renderTable();
   // update setup descriptions
-  [0, 1].forEach(i => { const d = el("setupDesc" + i); if (d) d.textContent = describeSetup(i); });
+  state.setups.forEach((su, i) => { const d = el("setupDesc" + i); if (d) d.textContent = describeSetup(i); });
 }
 
 function updateLabels() {
@@ -818,7 +866,7 @@ function renderStats(i) {
 function renderLegend() {
   let html = "";
   if (state.compare) {
-    html = [0, 1].map(i =>
+    html = activeIdxs().map(i =>
       '<span><span class="dot" style="background:' + SETUP_COLORS[i] + '"></span>' +
       SETUP_LETTERS[i] + ': ' + esc(describeSetup(i)) + '</span>'
     ).join("") + '<span><span class="ebar"></span>RPM range</span>';
@@ -860,7 +908,7 @@ function renderChart1() { renderGearChart("chart1", speedMetric); }
 function renderPowerChart() { renderGearChart("chartPower", wattsMetric); }
 function renderGearChart(hostId, metric) {
   // Sequence chart whenever comparing or in realistic mode; otherwise the single cog chart.
-  if (state.sort === "realistic" || state.compare) renderChartSeq(hostId, state.compare ? [0, 1] : [0], metric);
+  if (state.sort === "realistic" || state.compare) renderChartSeq(hostId, activeIdxs(), metric);
   else renderChartSingle(hostId, 0, metric);
 }
 
@@ -965,7 +1013,7 @@ function renderChart2() {
   const host = el("chart2"); host.innerHTML = "";
   // build rows
   let rows = [];
-  const idxs = state.compare ? [0, 1] : [0];
+  const idxs = activeIdxs();
   idxs.forEach(i => {
     const rings = activeRings(i);
     const src = state.sort === "realistic" ? realisticGears(i) : setupGears(i).gears;
@@ -1019,9 +1067,11 @@ function renderChart2() {
 function renderTable() {
   const host = el("table");
   if (!state.compare) { host.innerHTML = gridHTML(0); return; }
-  host.innerHTML = metricsHTML() +
-    '<h3 class="setup-title"><span class="chip" style="background:' + SETUP_COLORS[0] + '">A</span>' + esc(describeSetup(0)) + '</h3>' + gridHTML(0) +
-    '<h3 class="setup-title"><span class="chip" style="background:' + SETUP_COLORS[1] + '">B</span>' + esc(describeSetup(1)) + '</h3>' + gridHTML(1);
+  const grids = activeIdxs().map(i =>
+    '<h3 class="setup-title"><span class="chip" style="background:' + SETUP_COLORS[i] + '">' + SETUP_LETTERS[i] + '</span>' +
+    esc(describeSetup(i)) + '</h3>' + gridHTML(i)
+  ).join("");
+  host.innerHTML = metricsHTML() + grids;
 }
 
 function gridHTML(i) {
@@ -1064,27 +1114,33 @@ function gridHTML(i) {
 
 function metricsHTML() {
   const u = unitLabel();
-  const mA = computeMetrics(0), mB = computeMetrics(1);
-  const tA = thirds(stepsOf(0)), tB = thirds(stepsOf(1));
-  const rows = [
-    ["Top speed", fmt(mA.top) + " " + u, fmt(mB.top) + " " + u],
-    ["Easiest gear", fmt(mA.easy) + " " + u, fmt(mB.easy) + " " + u],
-    ["Speed range", fmt(mA.easy) + "–" + fmt(mA.top), fmt(mB.easy) + "–" + fmt(mB.top)],
-    ["Gear ratio range", mA.minR.toFixed(2) + "–" + mA.maxR.toFixed(2), mB.minR.toFixed(2) + "–" + mB.maxR.toFixed(2)],
-    ["Gear combinations", String(mA.nGears), String(mB.nGears)],
-    ["Avg step · easy ⅓", pct(tA.easy), pct(tB.easy)],
-    ["Avg step · middle ⅓", pct(tA.mid), pct(tB.mid)],
-    ["Avg step · hard ⅓", pct(tA.hard), pct(tB.hard)],
+  const climb = state.tab === "climb";
+  const D = activeIdxs().map(i => ({
+    i, m: computeMetrics(i), t: thirds(stepsOf(i)), w: climb ? wattsAtRange(i) : null,
+  }));
+  const rowsDef = [
+    ["Top speed", d => fmt(d.m.top) + " " + u],
+    ["Easiest gear", d => fmt(d.m.easy) + " " + u],
+    ["Speed range", d => fmt(d.m.easy) + "–" + fmt(d.m.top)],
+    ["Gear ratio range", d => d.m.minR.toFixed(2) + "–" + d.m.maxR.toFixed(2)],
+    ["Gear combinations", d => String(d.m.nGears)],
+    ["Avg step · easy ⅓", d => pct(d.t.easy)],
+    ["Avg step · middle ⅓", d => pct(d.t.mid)],
+    ["Avg step · hard ⅓", d => pct(d.t.hard)],
   ];
-  if (state.tab === "climb") {
-    const wA = wattsAtRange(0), wB = wattsAtRange(1);
-    rows.push(["Watts @ easiest gear", Math.round(wA.easyW) + " W", Math.round(wB.easyW) + " W"]);
-    rows.push(["Watts @ top gear", Math.round(wA.topW) + " W", Math.round(wB.topW) + " W"]);
+  if (climb) {
+    rowsDef.push(["Watts @ easiest gear", d => Math.round(d.w.easyW) + " W"]);
+    rowsDef.push(["Watts @ top gear", d => Math.round(d.w.topW) + " W"]);
   }
-  let html = '<div class="table-scroll"><table class="metrics"><thead><tr><th>Metric</th>' +
-    '<th class="setcol" style="background:' + SETUP_COLORS[0] + '">A · ' + esc(describeSetup(0)) + '</th>' +
-    '<th class="setcol" style="background:' + SETUP_COLORS[1] + '">B · ' + esc(describeSetup(1)) + '</th></tr></thead><tbody>';
-  rows.forEach(r => { html += "<tr><th>" + r[0] + "</th><td>" + r[1] + "</td><td>" + r[2] + "</td></tr>"; });
+  let html = '<div class="table-scroll"><table class="metrics"><thead><tr><th>Metric</th>';
+  D.forEach(d => html += '<th class="setcol" style="background:' + SETUP_COLORS[d.i] + '">' +
+    SETUP_LETTERS[d.i] + ' · ' + esc(describeSetup(d.i)) + '</th>');
+  html += '</tr></thead><tbody>';
+  rowsDef.forEach(rd => {
+    html += "<tr><th>" + rd[0] + "</th>";
+    D.forEach(d => html += "<td>" + rd[1](d) + "</td>");
+    html += "</tr>";
+  });
   html += "</tbody></table></div>";
   return html;
 }
@@ -1142,7 +1198,7 @@ function bind() {
     const b = e.target.closest("button"); if (!b) return;
     state.compare = b.dataset.cmp === "compare";
     [...el("compareToggle").children].forEach(x => x.classList.toggle("active", x === b));
-    el("setupBlocks").classList.toggle("cmp", state.compare);
+    updateSetupVisibility();
     render();
   });
   // sort toggle
@@ -1200,8 +1256,9 @@ function bind() {
     }
     render();
   });
-  // per-setup controls
-  [0, 1].forEach(i => bindSetup(i));
+  // add-comparison button
+  el("addSetupBtn").addEventListener("click", addSetup);
+  // per-setup controls are (re)bound by rebuildSetups()
 }
 
 function bindSetup(i) {
@@ -1221,8 +1278,14 @@ function bindSetup(i) {
     updateCustomVisibility(i);
     render();
   });
-  el("cassetteSelect" + i).addEventListener("input", () => { updateCustomVisibility(i); render(); });
-  el("customCassetteInput" + i).addEventListener("input", render);
+  el("cassetteSelect" + i).addEventListener("input", e => {
+    su.cassetteValue = e.target.value;
+    updateCustomVisibility(i);
+    render();
+  });
+  el("customCassetteInput" + i).addEventListener("input", e => { su.customCogsStr = e.target.value; render(); });
+  const rm = el("setupBlocks").children[i].querySelector(".remove-setup");
+  if (rm) rm.addEventListener("click", () => removeSetup(i));
 }
 
 /* ---------------------------- INIT ---------------------------- */
@@ -1230,18 +1293,8 @@ function init() {
   populateTire();
   populateClimb();
   el("weightInput").value = displayWeight();
-  buildSetupBlocks();
-  [0, 1].forEach(i => {
-    setModeButtons(i);
-    populateRing(i);
-    populateCassette(i);
-    const cs = el("cassetteSelect" + i);
-    for (let k = 0; k < cs.options.length; k++) {
-      if (cs.options[k].value === DEFAULT_CASSETTE[i]) { cs.selectedIndex = k; break; }
-    }
-  });
   bind();
-  [0, 1].forEach(updateCustomVisibility);
+  rebuildSetups();
   updateClimbCustomVisibility();
   render();
 }
